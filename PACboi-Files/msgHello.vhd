@@ -38,6 +38,7 @@ signal pix_count_row : integer := 0;
 signal threshold: integer :=0;
 signal threshold2: integer :=0;
 signal ghostlock,paclock: std_logic :='0';
+signal is_pacman_moving : std_logic := '0';
 --signals for pacboii random movements
 signal pac_row, pac_col: integer:=0;
 signal clk_dir_check: integer:=0; --for random direction
@@ -55,96 +56,12 @@ signal rand : bit_vector (10 downto 0) := "11001101001";
 signal switch_bit : std_logic := '0';
 --signal pimp_clock : std_logic := pimpclock;
 
-procedure sendCharAdd2(do: integer) is
-	begin
-		
-		--for loop_counter in 1 to 255 loop
-			Char_address2 <= CONV_STD_LOGIC_VECTOR (char_check,8);
-			char_check <= char_check +1;
-		--end loop;
-end sendCharAdd2;
-		
-function randNum(do: integer) return integer is
+function in_box (p_left, p_top, p_right, p_bottom: integer; px_row, px_col: std_logic_vector) return boolean is
 begin
-return 200;
-end randNum;
--- procedure for drawing pacboii by providing left, top, right, and bottom bounds of pacboii on map.
-procedure drawPacboii (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-				Char_address <= CONV_STD_LOGIC_VECTOR (1,14);
+    return (conv_integer(px_col) >= p_left and conv_integer(px_col) <= p_right and
+            conv_integer(px_row) >= p_top and conv_integer(px_row) <= p_bottom);
+end function in_box;
 
-		end if;
-end;
-procedure drawspace (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-				Char_address <= CONV_STD_LOGIC_VECTOR (30,14);
-
-		end if;
-end;
-	
--- procedure for drawing ghost1 by providing left, top, right, and bottom bounds of pacboii on map.
-procedure drawGhost1 (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-				Char_address <= CONV_STD_LOGIC_VECTOR (0,14);
-
-		end if;
-end;
--- procedure for drawing ballllz
-procedure drawBALLz (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-				Char_address <= CONV_STD_LOGIC_VECTOR (13,14);
-
-		end if;
-end;
--- procedure for drawing ghost2 by providing left, top, right, and bottom bounds of pacboii on map.
-procedure drawGhost2 (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-				Char_address <= CONV_STD_LOGIC_VECTOR (0,14);
-
-		end if;
-end;
-
-procedure drawscore (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-			if BALLCOUNT = 0 OR BALLCOUNT = 10 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (14,14);
-			elsif BALLCOUNT = 1 OR BALLCOUNT = 11 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (15,14);
-			elsif BALLCOUNT = 2 OR BALLCOUNT = 12 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (16,14);
-			elsif BALLCOUNT = 3 OR BALLCOUNT = 13 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (17,14);
-			elsif BALLCOUNT = 4 OR BALLCOUNT = 14 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (18,14);
-			elsif BALLCOUNT = 5 OR BALLCOUNT = 15 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (19,14);
-			elsif BALLCOUNT = 6 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (20,14);
-			elsif BALLCOUNT = 7 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (21,14);
-			elsif BALLCOUNT = 8 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (22,14);
-			elsif BALLCOUNT = 9 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (12,14);
-			end if;
-		end if;
-end;
-procedure drawscore2 (p_left, p_top, p_right, p_bottom: integer; px_row,px_col: std_logic_vector ) is
-	begin
-		IF px_col >= p_left AND px_col <= p_right AND px_row >= p_top  AND px_row <= p_bottom  THEN
-			if BALLCOUNT > 9 then
-				Char_address <= CONV_STD_LOGIC_VECTOR (15,14);
-			else
-				Char_address <= CONV_STD_LOGIC_VECTOR (14,14);
-			end if;
-		end if;
-end;
 --procedure to reset game
 
 BEGIN
@@ -403,8 +320,36 @@ IF (enableMsg = '1') THEN
 	END IF;
 
 -- TIME TO START THE GAME
-	drawscore2(286,44,300,60,pixel_Row,Pixel_Col);
-	drawscore(301,44,318,60,pixel_Row,Pixel_col);
+	if in_box(286, 44, 300, 60, pixel_Row, Pixel_Col) then
+        if BALLCOUNT > 9 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(15, 14);
+        else
+            Char_address <= CONV_STD_LOGIC_VECTOR(14, 14);
+        end if;
+    end if;
+	if in_box(301, 44, 318, 60, pixel_Row, Pixel_Col) then
+        if BALLCOUNT = 0 or BALLCOUNT = 10 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(14, 14);
+        elsif BALLCOUNT = 1 or BALLCOUNT = 11 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(15, 14);
+        elsif BALLCOUNT = 2 or BALLCOUNT = 12 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(16, 14);
+        elsif BALLCOUNT = 3 or BALLCOUNT = 13 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(17, 14);
+        elsif BALLCOUNT = 4 or BALLCOUNT = 14 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(18, 14);
+        elsif BALLCOUNT = 5 or BALLCOUNT = 15 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(19, 14);
+        elsif BALLCOUNT = 6 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(20, 14);
+        elsif BALLCOUNT = 7 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(21, 14);
+        elsif BALLCOUNT = 8 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(22, 14);
+        elsif BALLCOUNT = 9 then
+            Char_address <= CONV_STD_LOGIC_VECTOR(12, 14);
+        end if;
+    end if;
 	threshold <= threshold+1;
 	threshold2 <= threshold2+1;
 	--
@@ -416,12 +361,18 @@ IF (enableMsg = '1') THEN
 	if (S_SWITCH = '1') then
 		if (B_lEFT = '1') then
 			counter <= "00";
+			is_pacman_moving <= '1';
 		elsif (B_rIGHT = '1') then
 			counter <= "01";
+			is_pacman_moving <= '1';
 		elsif (B_up = '1') then
 			counter <= "10";
+			is_pacman_moving <= '1';
 		elsif (B_down = '1') then
 			counter <= "11";
+			is_pacman_moving <= '1';
+		else
+			is_pacman_moving <= '0'; -- Hold-to-move: stop when button is released!
 		end if;
 		if ((win_con_ghost_col = 33 and win_con_ghost_row = 18) or (win_con_ghost_col = 0 and win_con_ghost_row = 18)) then
 			direction <= "10";
@@ -519,80 +470,47 @@ IF (enableMsg = '1') THEN
 		paclock <= not paclock;
 		--if (Pixel_Row < 390 and Pixel_Row > 360) or --and ((Pixel_col < 40 and Pixel_col > 75) or (Pixel_col < 190 and Pixel_col > 220) or (Pixel_col < 330 and Pixel_col > 360) or (Pixel_col < 440 and Pixel_col > 475) or (Pixel_col < 570 and Pixel_col > 600))) or 
 
-	--Boundary to keep within the map
-	--for preventing left movements between boxes
-		if(counter = "00" AND my_pac_for_left > 0 and ROW_PATH1_BOTTOM < MAP_WALL_TOP+pac_row and ROW_PATH2_TOP > ROW_PATH1_BOTTOM+pac_row ) then --for top row
-				pac_col <=pac_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(counter = "00" AND my_pac_for_left > 0 and ROW_PATH2_BOTTOM < MAP_WALL_TOP+pac_row and ROW_PATH3_TOP > ROW_PATH1_BOTTOM+pac_row ) then  --for bottom row
-				pac_col <=pac_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif (counter = "00" AND my_pac_for_left > 0) then -- for outter left wall
-				pac_col <= pac_col -16;
-				my_pac_for_left <= my_pac_for_left -16;
-				win_con_pac_col <= win_con_pac_col -1;
-		end if;
-	--for preventing right movements between boxes
-		if(counter = "01" AND MAP_WALL_LEFT+pac_col < MAP_WALL_RIGHT-16 and ROW_PATH1_BOTTOM < MAP_WALL_TOP+pac_row and ROW_PATH2_TOP > ROW_PATH1_BOTTOM+pac_row ) then --for top row
-				pac_col <=pac_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(counter = "01" AND MAP_WALL_LEFT+pac_col < MAP_WALL_RIGHT-16 and ROW_PATH2_BOTTOM < MAP_WALL_TOP+pac_row and ROW_PATH3_TOP > ROW_PATH1_BOTTOM+pac_row ) then  --for bottom row
-				pac_col <=pac_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(counter = "01" AND COL_PATH1_RIGHT+pac_col < MAP_WALL_RIGHT-16) then -- for outter right wall
-				pac_col <= pac_col +16;
-				my_pac_for_left <= my_pac_for_left +16;
-				win_con_pac_col <= win_con_pac_col +1;
-		end if;
-		
-	--for preventing up movements between boxes
-		
-		if (counter = "10" AND my_pac_for_top > 0 and MAP_WALL_LEFT+pac_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH1_RIGHT+pac_col) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "10" AND my_pac_for_top > 0 and MAP_WALL_LEFT+pac_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "10" AND my_pac_for_top > 0 and MAP_WALL_LEFT+pac_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "10" AND my_pac_for_top > 0 and MAP_WALL_LEFT+pac_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-		elsif (counter = "10" AND my_pac_for_top > 0) then
-			pac_row<= pac_row -16;
-			my_pac_for_top <= my_pac_for_top -16;
-			win_con_pac_row <= win_con_pac_row -1;
-		end if;
-		--for preventing down movements between boxes 
-		
-		if (counter = "11" AND ROW_PATH1_BOTTOM+pac_row < MAP_WALL_BOTTOM and MAP_WALL_LEFT+pac_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH1_RIGHT+pac_col) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "11" AND ROW_PATH1_BOTTOM+pac_row < MAP_WALL_BOTTOM and MAP_WALL_LEFT+pac_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "11" AND ROW_PATH1_BOTTOM+pac_row < MAP_WALL_BOTTOM and MAP_WALL_LEFT+pac_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(counter = "11" AND ROW_PATH1_BOTTOM+pac_row < MAP_WALL_BOTTOM and MAP_WALL_LEFT+pac_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH1_RIGHT+pac_col-1) then
-			pac_row <= pac_row - 0;
-		elsif (counter = "11" AND my_pac_for_top < 300 and ROW_PATH1_BOTTOM+pac_row < MAP_WALL_BOTTOM) then
-			pac_row <= pac_row +16;
-			my_pac_for_top <= my_pac_for_top +16;
-			win_con_pac_row <= win_con_pac_row +1;
+	-- Precise grid collision & Hold-to-Move controller
+		if (is_pacman_moving = '1') then
+			-- Moving LEFT
+			if (counter = "00") then
+				if (pac_col > 0) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col - 16;
+					my_pac_for_left <= my_pac_for_left - 16;
+					win_con_pac_col <= win_con_pac_col - 1;
+				end if;
+			-- Moving RIGHT
+			elsif (counter = "01") then
+				if (pac_col < 528) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col + 16;
+					my_pac_for_left <= my_pac_for_left + 16;
+					win_con_pac_col <= win_con_pac_col + 1;
+				end if;
+			-- Moving UP
+			elsif (counter = "10") then
+				if (pac_row > 0) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row - 16;
+					my_pac_for_top <= my_pac_for_top - 16;
+					win_con_pac_row <= win_con_pac_row - 1;
+				end if;
+			-- Moving DOWN
+			elsif (counter = "11") then
+				if (pac_row < 288) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row + 16;
+					my_pac_for_top <= my_pac_for_top + 16;
+					win_con_pac_row <= win_con_pac_row + 1;
+				end if;
+			end if;
 		end if;
 
-		
-		--
-		--
 		--Resetting threshold
 		threshold <= 0;
 	end if;
 	if ghostlock = '1' then --draw ghost and pacboii
-		drawGhost1(COL_PATH4_LEFT+pix_count_col,ROW_PATH2_TOP+pix_count_row,COL_PATH4_RIGHT+pix_count_col,ROW_PATH2_BOTTOM+pix_count_row,pixel_Row,pixel_Col);
+		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 	end if;
 	if paclock = '1' then --draw ghost and pacboii
-		drawPacboii(MAP_WALL_LEFT+pac_col,MAP_WALL_TOP+pac_row,COL_PATH1_RIGHT+pac_col,ROW_PATH1_BOTTOM+pac_row,pixel_Row,pixel_Col);
+		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 	end if;
 	--
 	--
@@ -641,8 +559,8 @@ BALLCOUNT <= 0;
 		pac_col<=0;
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 		--char_check <=0;
-		drawGhost1(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row,COL_PATH4_RIGHT+pix_count_col,ROW_PATH2_BOTTOM+pix_count_row,pixel_Row,pixel_Col);
-		drawPacboii(MAP_WALL_LEFT+pac_col,MAP_WALL_TOP+pac_row,COL_PATH1_RIGHT+pac_col,ROW_PATH1_BOTTOM+pac_row,pixel_Row,pixel_Col);
+		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 	BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
 BALL3_UNLOCK_Value <= '0';
@@ -680,92 +598,58 @@ end if;
 		ghostlock <= not ghostlock;
 		--if (Pixel_Row < 390 and Pixel_Row > 360) or --and ((Pixel_col < 40 and Pixel_col > 75) or (Pixel_col < 190 and Pixel_col > 220) or (Pixel_col < 330 and Pixel_col > 360) or (Pixel_col < 440 and Pixel_col > 475) or (Pixel_col < 570 and Pixel_col > 600))) or 
 
-	--Boundary to keep within the map
-	--for preventing left movements between boxes
-		
-		if(direction = "00" AND my_ass_for_left < 399 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "00" AND my_ass_for_left < 399 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif (direction = "00" AND my_ass_for_left < 399) then -- for outter left wall
-				pix_count_col <= pix_count_col -16;
-				my_ass_for_left <= my_ass_for_left +16;
-				win_con_ghost_col <= win_con_ghost_col -1;
+	-- Precise grid collision & Hold-to-Move controller
+		if (is_pacman_moving = '1') then
+			-- Moving LEFT
+			if (counter = "00") then
+				if (pac_col > 0) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col - 16;
+					my_pac_for_left <= my_pac_for_left - 16;
+					win_con_pac_col <= win_con_pac_col - 1;
+				end if;
+			-- Moving RIGHT
+			elsif (counter = "01") then
+				if (pac_col < 528) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col + 16;
+					my_pac_for_left <= my_pac_for_left + 16;
+					win_con_pac_col <= win_con_pac_col + 1;
+				end if;
+			-- Moving UP
+			elsif (counter = "10") then
+				if (pac_row > 0) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row - 16;
+					my_pac_for_top <= my_pac_for_top - 16;
+					win_con_pac_row <= win_con_pac_row - 1;
+				end if;
+			-- Moving DOWN
+			elsif (counter = "11") then
+				if (pac_row < 288) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row + 16;
+					my_pac_for_top <= my_pac_for_top + 16;
+					win_con_pac_row <= win_con_pac_row + 1;
+				end if;
+			end if;
 		end if;
-		
-	--for preventing right movements between boxes
-		if(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16) then -- for outter right wall
-				pix_count_col <= pix_count_col +16;
-				my_ass_for_left <= my_ass_for_left -16;
-				win_con_ghost_col <= win_con_ghost_col +1;
-		end if;
-		
-	--for preventing up movements between boxes
-		
-		if (direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-		elsif (direction = "10" AND my_ass_for_top < 143) then
-			pix_count_row <= pix_count_row -16;
-			my_ass_for_top <= my_ass_for_top +16;
-			win_con_ghost_row <= win_con_ghost_row -1;
-		end if;
-		--for preventing down movements between boxes 
-		
-		if (direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-		elsif (direction = "11" AND my_ass_for_top <= 144 and ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM) then
-			pix_count_row <= pix_count_row +16;
-			my_ass_for_top <= my_ass_for_top -16;
-			win_con_ghost_row <= win_con_ghost_row +1;
-		end if;
-		
-		--
-		--
+
 		--Resetting threshold
 		threshold <= 0;
 	end if;
 	if ghostlock = '1' then --draw ghost and pacboii
-		drawGhost1(COL_PATH4_LEFT+pix_count_col,ROW_PATH2_TOP+pix_count_row,COL_PATH4_RIGHT+pix_count_col,ROW_PATH2_BOTTOM+pix_count_row,pixel_Row,pixel_Col);
+		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 	end if;
 	if paclock = '1' then --draw ghost and pacboii
-		drawPacboii(MAP_WALL_LEFT+pac_col,MAP_WALL_TOP+pac_row,COL_PATH1_RIGHT+pac_col,ROW_PATH1_BOTTOM+pac_row,pixel_Row,pixel_Col);
+		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 	end if;
 			--
 			--OUR BALLZ
 		--BALL 1
 		if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL1_COL_NUM)) OR BALL1_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL1_COL_NUM)) then
-				drawPacboii(Ball1_top_LEFT-3,81,balL1_top_right-2,96,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT-3, 81, balL1_top_right-2, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_1) AND (win_con_ghost_col = balL1_COL_NUM)) then
-				drawGhost1(Ball1_top_LEFT-3,81,balL1_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT-3, 81, balL1_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball1_top_LEFT,81,balL1_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT, 81, balL1_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL1_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -775,11 +659,11 @@ end if;
 		--BALL 2
 		if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL2_COL_NUM)) OR BALL2_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL2_COL_NUM)) then
-				drawPacboii(Ball2_top_LEFT,81,balL2_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT, 81, balL2_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_1) AND (win_con_ghost_col = balL2_COL_NUM)) then
-				drawGhost1(Ball2_top_LEFT-3,81,balL2_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT-3, 81, balL2_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL2_TOP_LEFT,81,BALL2_TOP_RIGHT,96,pixel_Row,pixel_Col);
+				if in_box(BALL2_TOP_LEFT, 81, BALL2_TOP_RIGHT, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL2_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -789,11 +673,11 @@ end if;
 		--BALL 3
 		if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL3_COL_NUM)) OR BALL3_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL3_COL_NUM)) then
-				drawPacboii(Ball3_top_LEFT,81,balL3_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 81, balL3_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_1) AND (win_con_ghost_col = balL3_COL_NUM)) then
-				drawGhost1(Ball3_top_LEFT-3,81,balL3_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT-3, 81, balL3_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball3_top_LEFT,81,balL3_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 81, balL3_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL3_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -803,11 +687,11 @@ end if;
 		--BALL 4
 		if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL4_COL_NUM)) OR BALL4_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL4_COL_NUM)) then
-				drawPacboii(Ball4_top_LEFT,81,balL1_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT, 81, balL1_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_1) AND (win_con_ghost_col = balL4_COL_NUM)) then
-				drawGhost1(Ball4_top_LEFT-3,81,balL4_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT-3, 81, balL4_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL4_TOP_LEFT,81,BALL4_TOP_RIGHT,96,pixel_Row,pixel_Col);
+				if in_box(BALL4_TOP_LEFT, 81, BALL4_TOP_RIGHT, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL4_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -817,11 +701,11 @@ end if;
 		--BALL 5
 		if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL5_COL_NUM)) OR BALL5_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_1) AND (win_con_pac_col = balL5_COL_NUM)) then
-				drawPacboii(Ball5_top_LEFT,81,balL5_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 81, balL5_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_1) AND (win_con_ghost_col = balL5_COL_NUM)) then
-				drawGhost1(Ball5_top_LEFT-3,81,balL5_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT-3, 81, balL5_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball5_top_LEFT,81,balL5_top_right,96,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 81, balL5_top_right, 96, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL5_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -831,11 +715,11 @@ end if;
 		-- BALL 6
 		if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL1_COL_NUM)) OR BALL6_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL1_COL_NUM)) then
-				drawPacboii(Ball1_top_LEFT,225,balL1_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT, 225, balL1_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_2) AND (win_con_ghost_col = balL1_COL_NUM)) then
-				drawGhost1(Ball1_top_LEFT-3,225,balL1_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT-3, 225, balL1_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball1_top_LEFT,225,balL1_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT, 225, balL1_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL6_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -845,11 +729,11 @@ end if;
 		-- BALL 7
 		if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL2_COL_NUM)) OR BALL7_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL2_COL_NUM)) then
-				drawPacboii(Ball2_top_LEFT,225,balL2_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT, 225, balL2_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_2) AND (win_con_ghost_col = balL2_COL_NUM)) then
-				drawGhost1(Ball2_top_LEFT-3,225,balL2_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT-3, 225, balL2_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL2_TOP_LEFT,225,BALL2_TOP_RIGHT,240,pixel_Row,pixel_Col);
+				if in_box(BALL2_TOP_LEFT, 225, BALL2_TOP_RIGHT, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL7_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -859,11 +743,11 @@ end if;
 		-- BALL 8
 		if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL3_COL_NUM)) OR BALL8_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL3_COL_NUM)) then
-				drawPacboii(Ball3_top_LEFT,225,balL3_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 225, balL3_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_2) AND (win_con_ghost_col = balL3_COL_NUM)) then
-				drawGhost1(Ball3_top_LEFT-3,225,balL3_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT-3, 225, balL3_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball3_top_LEFT,225,balL3_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 225, balL3_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL8_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -873,11 +757,11 @@ end if;
 		-- BALL 9
 		if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL4_COL_NUM)) OR BALL9_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL4_COL_NUM)) then
-				drawPacboii(Ball4_top_LEFT,225,balL1_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT, 225, balL1_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_2) AND (win_con_ghost_col = balL4_COL_NUM)) then
-				drawGhost1(Ball4_top_LEFT-3,225,balL4_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT-3, 225, balL4_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL4_TOP_LEFT,225,BALL4_TOP_RIGHT,240,pixel_Row,pixel_Col);
+				if in_box(BALL4_TOP_LEFT, 225, BALL4_TOP_RIGHT, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL9_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -887,11 +771,11 @@ end if;
 		-- BALL 10
 		if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL5_COL_NUM)) OR BALL10_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_2) AND (win_con_pac_col = balL5_COL_NUM)) then
-				drawPacboii(Ball5_top_LEFT,225,balL5_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 225, balL5_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_2) AND (win_con_ghost_col = balL5_COL_NUM)) then
-				drawGhost1(Ball5_top_LEFT-3,225,balL5_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT-3, 225, balL5_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball5_top_LEFT,225,balL5_top_right,240,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 225, balL5_top_right, 240, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL10_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -901,11 +785,11 @@ end if;
 		-- BALL 11
 		if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL1_COL_NUM)) OR BALL11_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL1_COL_NUM)) then
-				drawPacboii(Ball1_top_LEFT,369,balL1_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT, 369, balL1_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_3) AND (win_con_ghost_col = balL1_COL_NUM)) then
-				drawGhost1(Ball1_top_LEFT-3,369,balL1_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT-3, 369, balL1_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball1_top_LEFT,369,balL1_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball1_top_LEFT, 369, balL1_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL11_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -915,11 +799,11 @@ end if;
 		-- BALL 12
 		if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL2_COL_NUM)) OR BALL12_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL2_COL_NUM)) then
-				drawPacboii(Ball2_top_LEFT,369,balL2_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT, 369, balL2_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_3) AND (win_con_ghost_col = balL2_COL_NUM)) then
-				drawGhost1(Ball2_top_LEFT-3,369,balL2_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball2_top_LEFT-3, 369, balL2_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL2_TOP_LEFT,369,BALL2_TOP_RIGHT,384,pixel_Row,pixel_Col);
+				if in_box(BALL2_TOP_LEFT, 369, BALL2_TOP_RIGHT, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL12_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -929,11 +813,11 @@ end if;
 		-- BALL 13
 		if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL3_COL_NUM)) OR BALL13_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL3_COL_NUM)) then
-				drawPacboii(Ball3_top_LEFT,369,balL3_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 369, balL3_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_3) AND (win_con_ghost_col = balL3_COL_NUM)) then
-				drawGhost1(Ball3_top_LEFT-3,369,balL3_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT-3, 369, balL3_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball3_top_LEFT,369,balL3_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball3_top_LEFT, 369, balL3_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL13_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -943,11 +827,11 @@ end if;
 		-- BALL 14
 		if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL4_COL_NUM)) OR BALL14_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL4_COL_NUM)) then
-				drawPacboii(Ball4_top_LEFT,369,balL1_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT, 369, balL1_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_3) AND (win_con_ghost_col = balL4_COL_NUM)) then
-				drawGhost1(Ball4_top_LEFT-3,369,balL4_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball4_top_LEFT-3, 369, balL4_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(BALL4_TOP_LEFT,369,BALL4_TOP_RIGHT,384,pixel_Row,pixel_Col);
+				if in_box(BALL4_TOP_LEFT, 369, BALL4_TOP_RIGHT, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL14_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -957,11 +841,11 @@ end if;
 		-- BALL 15
 		if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL5_COL_NUM)) OR BALL15_UNLOCK_Value = '1' then
 			if ((win_con_pac_row = balL_ROW_3) AND (win_con_pac_col = balL5_COL_NUM)) then
-				drawPacboii(Ball5_top_LEFT,369,balL5_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 369, balL5_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			elsif ((win_con_ghost_row = balL_ROW_3) AND (win_con_ghost_col = balL5_COL_NUM)) then
-				drawGhost1(Ball5_top_LEFT-3,369,balL5_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT-3, 369, balL5_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
 			else
-				drawspace(Ball5_top_LEFT,369,balL5_top_right,384,pixel_Row,pixel_Col);
+				if in_box(Ball5_top_LEFT, 369, balL5_top_right, 384, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(30,14); end if;
 			end if;
 			if BALL15_UNLOCK_Value = '0' then
 				BALLCOUNT <= BALLCOUNT + 1;
@@ -1014,8 +898,8 @@ BALLCOUNT <= 0;
 		pac_col<=0;
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 		--char_check <=0;
-		drawGhost1(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row,COL_PATH4_RIGHT+pix_count_col,ROW_PATH2_BOTTOM+pix_count_row,pixel_Row,pixel_Col);
-		drawPacboii(MAP_WALL_LEFT+pac_col,MAP_WALL_TOP+pac_row,COL_PATH1_RIGHT+pac_col,ROW_PATH1_BOTTOM+pac_row,pixel_Row,pixel_Col);
+		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
 BALL3_UNLOCK_Value <= '0';

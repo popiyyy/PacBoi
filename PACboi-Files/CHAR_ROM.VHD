@@ -715,7 +715,7 @@ ARCHITECTURE behavioral OF Char_ROM IS
         696 => "0000000000000000",
         697 => "0000000000000000",
         698 => "0000000000000000",
-        699 => "0000000000000000";
+        699 => "0000000000000000"
     );
     signal rom_data : std_logic_vector(15 downto 0) := (others => '0');
 BEGIN
