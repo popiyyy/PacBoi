@@ -1,8 +1,7 @@
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 USE ieee.std_logic_arith.all;
-USE ieee.numeric_std.all;
-use IEEE.STD_LOGIC_UNSIGNED.ALL;
+USE ieee.std_logic_unsigned.all;
 
 
 
@@ -11,9 +10,9 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 ENTITY msgHello IS
  PORT ( Pixel_row: IN std_logic_vector(9 downto 0);
 		   Pixel_col: IN std_logic_vector (9 downto 0);			
-		  enableMsg : IN bit;
+		  enableMsg : IN std_logic;
 		  pimpclock,clk : IN STD_LOGIC; 
-		  S_SWITCH, R_SWITCH, B_UP, B_DOWN, B_LEFT, B_RIGHT :	IN bit;
+		  S_SWITCH, R_SWITCH, B_UP, B_DOWN, B_LEFT, B_RIGHT : IN std_logic;
 	      Char_address: OUT std_logic_vector (13 downto 0);
 			Char_address2: buffer std_logic_vector (7 downto 0);
 	     	 Font_row: OUT std_logic_vector (3 downto 0);
@@ -150,7 +149,7 @@ end;
 
 BEGIN
 
-PROCESS  --(Pixel_Row,Pixel_col)
+PROCESS(clk)
 variable pacboii_row : integer := 225;
 variable pacboii_col : integer := 1;
 constant MAP_WALL_LEFT: integer := 48;
@@ -189,7 +188,7 @@ constant BALL_ROW_2 : integer := 9;
 constant BALL_ROW_3 : integer := 18;
 
 BEGIN 
-wait on R_SWITCH, pixel_Col, pixel_Row until (clk'event and clk ='1');
+IF rising_edge(clk) THEN
 IF (enableMsg = '1') THEN
 -- FIRST BLANK
  IF Pixel_Col >= 1 AND Pixel_Col <= 640 AND Pixel_row >= 1 AND Pixel_row <= 16  THEN 
@@ -415,13 +414,13 @@ IF (enableMsg = '1') THEN
 	-- Direction controls ghost movements
 	
 	if (S_SWITCH = '1') then
-		if (B_lEFT = '0') then
+		if (B_lEFT = '1') then
 			counter <= "00";
-		elsif (B_rIGHT = '0') then
+		elsif (B_rIGHT = '1') then
 			counter <= "01";
-		elsif (B_up = '0') then
+		elsif (B_up = '1') then
 			counter <= "10";
-		elsif (B_down = '0') then
+		elsif (B_down = '1') then
 			counter <= "11";
 		end if;
 		if ((win_con_ghost_col = 33 and win_con_ghost_row = 18) or (win_con_ghost_col = 0 and win_con_ghost_row = 18)) then
@@ -462,13 +461,13 @@ IF (enableMsg = '1') THEN
 		end if;
 	--Now to control Ghostie
 	else
-		if (B_lEFT = '0') then
+		if (B_lEFT = '1') then
 			direction <= "00";
-		elsif (B_rIGHT = '0') then
+		elsif (B_rIGHT = '1') then
 			direction <= "01";
-		elsif (B_up = '0') then
+		elsif (B_up = '1') then
 			direction <= "10";
-		elsif (B_down = '0') then
+		elsif (B_down = '1') then
 			direction <= "11";
 		end if;
 		if ((win_con_pac_col = 33 and win_con_pac_row = 18) or (win_con_pac_col = 0 and win_con_pac_row = 18)) then
@@ -1034,5 +1033,6 @@ BALL14_UNLOCK_Value <= '0';
 BALL15_UNLOCK_Value <= '0';
 BALLCOUNT <= 0;
 	end if;
+    END IF; -- rising_edge(clk)
 END PROCESS;
 END;
