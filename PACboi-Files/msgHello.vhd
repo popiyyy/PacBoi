@@ -533,8 +533,25 @@ IF (enableMsg = '1') THEN
 	--
 	--
 	--
-	-- WIN THE GAME HERE 1
-if (win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col) then
+	-- WIN THE GAME HERE 1 / GHOST CATCHES PACMAN (INSTANT RESET)
+	if (
+		-- 1. Exact grid tile match
+		(win_con_ghost_row = win_con_pac_row and win_con_ghost_col = win_con_pac_col)
+		or
+		-- 2. Same row and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_row = win_con_pac_row and 
+		 (win_con_ghost_col - win_con_pac_col >= -1 and win_con_ghost_col - win_con_pac_col <= 1))
+		or
+		-- 3. Same column and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_col = win_con_pac_col and 
+		 (win_con_ghost_row - win_con_pac_row >= -1 and win_con_ghost_row - win_con_pac_row <= 1))
+		or
+		-- 4. Screen bounding box overlap (with 4px margin)
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
 	win_con_pac_col <= 0;
@@ -545,6 +562,8 @@ if (win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col)
 		my_ass_for_top<=0;
 		pac_row<=0;
 		pac_col<=0;
+		my_pac_for_left<=0;
+		my_pac_for_top<=0;
 		pac_started <= '0';
 		pac_current_dir <= "01";
 		pac_desired_dir <= "01";
@@ -904,7 +923,26 @@ end if;
 		end if;
 		
 -- WIN 2 BECAUSE IDK WHY IT WORKS THOUGH
-	if ((win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col) OR BALLCOUNT = 15) then
+	if (
+		BALLCOUNT = 15
+		or
+		-- 1. Exact grid tile match
+		(win_con_ghost_row = win_con_pac_row and win_con_ghost_col = win_con_pac_col)
+		or
+		-- 2. Same row and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_row = win_con_pac_row and 
+		 (win_con_ghost_col - win_con_pac_col >= -1 and win_con_ghost_col - win_con_pac_col <= 1))
+		or
+		-- 3. Same column and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_col = win_con_pac_col and 
+		 (win_con_ghost_row - win_con_pac_row >= -1 and win_con_ghost_row - win_con_pac_row <= 1))
+		or
+		-- 4. Screen bounding box overlap (with 4px margin)
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
 	win_con_pac_col <= 0;
@@ -915,6 +953,8 @@ end if;
 		my_ass_for_top<=0;
 		pac_row<=0;
 		pac_col<=0;
+		my_pac_for_left<=0;
+		my_pac_for_top<=0;
 		pac_started <= '0';
 		pac_current_dir <= "01";
 		pac_desired_dir <= "01";
