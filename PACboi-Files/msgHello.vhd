@@ -66,6 +66,7 @@ signal isHitTopWall,isHitLeftWall,isHitBottomWall,isHitRightWall : std_logic := 
 signal gUp,gRight,gDown,gLeft : std_logic := '0';
 signal BALLCOUNT : integer := 0;
 signal HIGH_SCORE : integer := 0;
+signal lives : integer range 0 to 2 := 2;
 signal game_over_reg : std_logic := '0';
 signal ball_char_addr : std_logic_vector(13 downto 0) := CONV_STD_LOGIC_VECTOR(13, 14);
 signal ball_pulse : std_logic := '0';
@@ -343,6 +344,18 @@ IF (enableMsg = '1') THEN
 		Char_address <= CONV_STD_LOGIC_VECTOR (30,14); 
 	END IF;
 	END IF;
+-- BOTTOM HUD AREA (LIVES INDICATOR AT BOTTOM-LEFT)
+	IF Pixel_Col >= 1 AND Pixel_Col <= 640 AND Pixel_row >= 401 AND Pixel_row <= 480 THEN
+		Font_row <= Pixel_row(3 downto 0);
+		Font_col <= Pixel_col(3 downto 0);
+		if lives >= 1 and in_box(32, 416, 47, 431, pixel_Row, Pixel_Col) then
+			Char_address <= CONV_STD_LOGIC_VECTOR(1, 14);
+		elsif lives >= 2 and in_box(64, 416, 79, 431, pixel_Row, Pixel_Col) then
+			Char_address <= CONV_STD_LOGIC_VECTOR(1, 14);
+		else
+			Char_address <= CONV_STD_LOGIC_VECTOR(30, 14);
+		end if;
+	END IF;
 
 -- TIME TO START THE GAME (Score & High Score rendered uniformly by HUD overlay)
 	score_out <= BALLCOUNT mod 100;
@@ -579,26 +592,17 @@ IF (enableMsg = '1') THEN
 		my_pac_for_left<=0;
 		my_pac_for_top<=0;
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
-BALL1_UNLOCK_Value <= '0';
-BALL2_UNLOCK_Value <= '0';
-BALL3_UNLOCK_Value <= '0';
-BALL4_UNLOCK_Value <= '0';
-BALL5_UNLOCK_Value <= '0';
-BALL6_UNLOCK_Value <= '0';
-BALL7_UNLOCK_Value <= '0';
-BALL8_UNLOCK_Value <= '0';
-BALL9_UNLOCK_Value <= '0';
-BALL10_UNLOCK_Value <= '0';
-BALL11_UNLOCK_Value <= '0';
-BALL12_UNLOCK_Value <= '0';
-BALL13_UNLOCK_Value <= '0';
-BALL14_UNLOCK_Value <= '0';
-BALL15_UNLOCK_Value <= '0';
-game_over_reg <= '1';
+		if lives > 1 then
+			lives <= lives - 1;
+		else
+			lives <= 0;
+			game_over_reg <= '1';
+		end if;
 	end if;
 	-- RESET THE GAME HERE 1
 	if (R_SWITCH ='1') then --reset game to default start position
 		game_over_reg <= '0';
+		lives <= 2;
 		win_con_ghost_row <= 9;
 		win_con_ghost_col <= 25;
 		win_con_ghost2_row <= 18;
@@ -1085,25 +1089,16 @@ end if; -- enableMsg = '1'
 		my_pac_for_left<=0;
 		my_pac_for_top<=0;
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
-BALL1_UNLOCK_Value <= '0';
-BALL2_UNLOCK_Value <= '0';
-BALL3_UNLOCK_Value <= '0';
-BALL4_UNLOCK_Value <= '0';
-BALL5_UNLOCK_Value <= '0';
-BALL6_UNLOCK_Value <= '0';
-BALL7_UNLOCK_Value <= '0';
-BALL8_UNLOCK_Value <= '0';
-BALL9_UNLOCK_Value <= '0';
-BALL10_UNLOCK_Value <= '0';
-BALL11_UNLOCK_Value <= '0';
-BALL12_UNLOCK_Value <= '0';
-BALL13_UNLOCK_Value <= '0';
-BALL14_UNLOCK_Value <= '0';
-BALL15_UNLOCK_Value <= '0';
-game_over_reg <= '1';
+		if lives > 1 then
+			lives <= lives - 1;
+		else
+			lives <= 0;
+			game_over_reg <= '1';
+		end if;
 	end if;
 	if (R_SWITCH ='1') then --reset game to default start position
 		game_over_reg <= '0';
+		lives <= 2;
 		win_con_ghost_row <= 9;
 		win_con_ghost_col <= 25;
 		win_con_ghost2_row <= 18;
