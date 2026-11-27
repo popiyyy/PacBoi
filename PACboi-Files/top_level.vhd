@@ -66,11 +66,15 @@ ARCHITECTURE structural OF top_level IS
 
     COMPONENT pause_menu IS
         PORT(
-            pixel_row  : IN  std_logic_vector(9 DOWNTO 0);
-            pixel_col  : IN  std_logic_vector(9 DOWNTO 0);
-            pause_sel  : IN  std_logic;
-            box_active : OUT std_logic;
-            pixel_on   : OUT std_logic
+            pixel_row      : IN  std_logic_vector(9 DOWNTO 0);
+            pixel_col      : IN  std_logic_vector(9 DOWNTO 0);
+            pause_sel      : IN  std_logic;
+            game_over      : IN  std_logic := '0';
+            score_val      : IN  integer range 0 to 99 := 0;
+            high_score_val : IN  integer range 0 to 99 := 0;
+            box_active     : OUT std_logic;
+            pixel_on       : OUT std_logic;
+            hud_pixel_on   : OUT std_logic
         );
     END COMPONENT;
 
@@ -81,8 +85,11 @@ ARCHITECTURE structural OF top_level IS
             enableMsg : IN std_logic;
             pimpclock, clk : IN STD_LOGIC;
             S_SWITCH, R_SWITCH, B_UP, B_DOWN, B_LEFT, B_RIGHT : IN std_logic;
-            pause_en     : IN std_logic := '0';
-            Char_address : OUT std_logic_vector(13 downto 0);
+            pause_en       : IN std_logic := '0';
+            score_out      : OUT integer range 0 to 99;
+            high_score_out : OUT integer range 0 to 99;
+            game_over_out  : OUT std_logic;
+            Char_address   : OUT std_logic_vector(13 downto 0);
             Char_address2: buffer std_logic_vector(7 downto 0);
             Font_row     : OUT std_logic_vector(3 downto 0);
             Font_col     : OUT std_logic_vector(3 downto 0)
@@ -108,6 +115,8 @@ ARCHITECTURE structural OF top_level IS
     SIGNAL btn_up_prev     : std_logic := '0';
     SIGNAL btn_down_prev   : std_logic := '0';
     SIGNAL game_running    : std_logic := '1';
+    SIGNAL game_over_sig   : std_logic := '0';
+    SIGNAL game_over_state : std_logic := '0';
     SIGNAL game_paused     : std_logic;
     SIGNAL pause_sel       : std_logic := '0'; -- '0' = LANJUTKAN, '1' = ULANG
     SIGNAL restart_cnt     : integer range 0 to 1000000 := 0;
@@ -120,6 +129,9 @@ ARCHITECTURE structural OF top_level IS
     SIGNAL btn_right_gated : std_logic;
     SIGNAL pause_box_active: std_logic;
     SIGNAL pause_pixel_on  : std_logic;
+    SIGNAL hud_pixel_on_sig: std_logic;
+    SIGNAL score_sig       : integer range 0 to 99 := 0;
+    SIGNAL high_score_sig  : integer range 0 to 99 := 0;
     SIGNAL final_color_bit : std_logic;
 
 BEGIN
@@ -128,13 +140,14 @@ BEGIN
     process(clk_25MHz, sw_reset)
     begin
         if sw_reset = '1' then
-            game_running   <= '1';
-            pause_sel      <= '0';
-            btn_start_prev <= '0';
-            btn_up_prev    <= '0';
-            btn_down_prev  <= '0';
-            restart_cnt    <= 0;
-            restart_pulse  <= '0';
+            game_running    <= '1';
+            game_over_state <= '0';
+            pause_sel       <= '0';
+            btn_start_prev  <= '0';
+            btn_up_prev     <= '0';
+            btn_down_prev   <= '0';
+            restart_cnt     <= 0;
+            restart_pulse   <= '0';
         elsif rising_edge(clk_25MHz) then
             btn_start_prev <= btn_start;
             btn_up_prev    <= btn_up;
@@ -147,7 +160,17 @@ BEGIN
                 restart_pulse <= '0';
             end if;
 
-            if game_running = '1' then
+            if game_over_state = '1' then
+                -- Wait for player to press Start on "> LANJUT"
+                if (btn_start = '1' and btn_start_prev = '0') then
+                    game_over_state <= '0';
+                    game_running    <= '1';
+                    restart_cnt     <= 1000000; -- ~40ms reset pulse to clear score & positions
+                end if;
+            elsif (game_over_sig = '1' and restart_cnt = 0) then
+                -- Ghost caught Pacman -> enter Game Over screen
+                game_over_state <= '1';
+            elsif game_running = '1' then
                 if (btn_start = '1' and btn_start_prev = '0') then
                     game_running <= '0';
                     pause_sel    <= '0';
@@ -170,14 +193,14 @@ BEGIN
         end if;
     end process;
 
-    -- Freeze game clock and player movements when paused
-    game_paused     <= not game_running;
+    -- Freeze game clock and player movements when paused or game over
+    game_paused     <= (not game_running) or game_over_state;
     game_reset_sig  <= sw_reset or restart_pulse;
-    clk_game_gated  <= clk_game  when game_running = '1' else '0';
-    btn_up_gated    <= btn_up    when game_running = '1' else '0';
-    btn_down_gated  <= btn_down  when game_running = '1' else '0';
-    btn_left_gated  <= btn_left  when game_running = '1' else '0';
-    btn_right_gated <= btn_right when game_running = '1' else '0';
+    clk_game_gated  <= clk_game  when (game_running = '1' and game_over_state = '0') else '0';
+    btn_up_gated    <= btn_up    when (game_running = '1' and game_over_state = '0') else '0';
+    btn_down_gated  <= btn_down  when (game_running = '1' and game_over_state = '0') else '0';
+    btn_left_gated  <= btn_left  when (game_running = '1' and game_over_state = '0') else '0';
+    btn_right_gated <= btn_right when (game_running = '1' and game_over_state = '0') else '0';
 
     -- 1. Clock Divider Module (100 MHz -> 25 MHz & Game Clock)
     u_clkdiv: clkdiv
@@ -219,8 +242,11 @@ BEGIN
             B_DOWN        => btn_down_gated,
             B_LEFT        => btn_left_gated,
             B_RIGHT       => btn_right_gated,
-            pause_en      => game_paused,
-            Char_address  => char_addr_sig,
+            pause_en       => game_paused,
+            score_out      => score_sig,
+            high_score_out => high_score_sig,
+            game_over_out  => game_over_sig,
+            Char_address   => char_addr_sig,
             Char_address2 => open,
             Font_row      => font_row_sig,
             Font_col      => font_col_sig
@@ -236,17 +262,21 @@ BEGIN
             rom_mux_output    => color_bit_sig
         );
 
-    -- 4b. Pause Menu Overlay
+    -- 4b. Pause Menu & Game Over Overlay
     u_pause_menu: pause_menu
         PORT MAP(
-            pixel_row  => pixel_row_sig,
-            pixel_col  => pixel_col_sig,
-            pause_sel  => pause_sel,
-            box_active => pause_box_active,
-            pixel_on   => pause_pixel_on
+            pixel_row      => pixel_row_sig,
+            pixel_col      => pixel_col_sig,
+            pause_sel      => pause_sel,
+            game_over      => game_over_state,
+            score_val      => score_sig,
+            high_score_val => high_score_sig,
+            box_active     => pause_box_active,
+            pixel_on       => pause_pixel_on,
+            hud_pixel_on   => hud_pixel_on_sig
         );
 
-    final_color_bit <= pause_pixel_on when (game_running = '0' and pause_box_active = '1') else color_bit_sig;
+    final_color_bit <= pause_pixel_on when ((game_running = '0' or game_over_state = '1') and pause_box_active = '1') else (color_bit_sig or hud_pixel_on_sig);
 
     -- 5. 12-bit RGB Color Converter
     u_yakuza_conv: YAKUZA_CONV
