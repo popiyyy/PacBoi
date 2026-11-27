@@ -40,9 +40,7 @@ signal threshold2: integer :=0;
 signal threshold_pac: integer := 0;
 signal threshold_ghost: integer := 0;
 signal ghostlock,paclock: std_logic :='0';
-signal pac_current_dir: bit_vector(1 downto 0) := "01";
-signal pac_desired_dir: bit_vector(1 downto 0) := "01";
-signal pac_started: std_logic := '0';
+signal is_pacman_moving : std_logic := '0';
 --signals for pacboii random movements
 signal pac_row, pac_col: integer:=0;
 signal clk_dir_check: integer:=0; --for random direction
@@ -365,17 +363,19 @@ IF (enableMsg = '1') THEN
 	
 	if (S_SWITCH = '1') then
 		if (B_lEFT = '1') then
-			pac_desired_dir <= "00";
-			pac_started     <= '1';
+			counter <= "00";
+			is_pacman_moving <= '1';
 		elsif (B_rIGHT = '1') then
-			pac_desired_dir <= "01";
-			pac_started     <= '1';
+			counter <= "01";
+			is_pacman_moving <= '1';
 		elsif (B_up = '1') then
-			pac_desired_dir <= "10";
-			pac_started     <= '1';
+			counter <= "10";
+			is_pacman_moving <= '1';
 		elsif (B_down = '1') then
-			pac_desired_dir <= "11";
-			pac_started     <= '1';
+			counter <= "11";
+			is_pacman_moving <= '1';
+		else
+			is_pacman_moving <= '0'; -- Hold-to-move: stop when button is released!
 		end if;
 		if ((win_con_ghost_col = 33 and win_con_ghost_row = 18) or (win_con_ghost_col = 0 and win_con_ghost_row = 18)) then
 			direction <= "10";
@@ -474,48 +474,31 @@ IF (enableMsg = '1') THEN
 		threshold_pac <= 0;
 		paclock <= not paclock;
 
-		if (pac_started = '1') then
-			-- 1. Check for immediate 180-degree turnaround
-			if (pac_current_dir = "00" and pac_desired_dir = "01") or
-			   (pac_current_dir = "01" and pac_desired_dir = "00") or
-			   (pac_current_dir = "10" and pac_desired_dir = "11") or
-			   (pac_current_dir = "11" and pac_desired_dir = "10") then
-				next_dir := pac_desired_dir;
-			-- 2. Turn horizontal (LEFT / RIGHT): allowed only at horizontal paths (row 0, 144, 288)
-			elsif (pac_desired_dir = "00" or pac_desired_dir = "01") and
-			      (pac_row = 0 or pac_row = 144 or pac_row = 288) then
-				next_dir := pac_desired_dir;
-			-- 3. Turn vertical (UP / DOWN): allowed only at vertical paths (col 0, 144, 288, 400, 528)
-			elsif (pac_desired_dir = "10" or pac_desired_dir = "11") and
-			      (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
-				next_dir := pac_desired_dir;
-			else
-				next_dir := pac_current_dir;
-			end if;
-
-			pac_current_dir <= next_dir;
-			counter <= next_dir;
-
-			-- Move Pacman in next_dir:
-			if (next_dir = "00") then -- LEFT
+	-- Precise grid collision & Hold-to-Move controller
+		if (is_pacman_moving = '1') then
+			-- Moving LEFT
+			if (counter = "00") then
 				if (pac_col > 0) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
 					pac_col <= pac_col - 16;
 					my_pac_for_left <= my_pac_for_left - 16;
 					win_con_pac_col <= win_con_pac_col - 1;
 				end if;
-			elsif (next_dir = "01") then -- RIGHT
+			-- Moving RIGHT
+			elsif (counter = "01") then
 				if (pac_col < 528) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
 					pac_col <= pac_col + 16;
 					my_pac_for_left <= my_pac_for_left + 16;
 					win_con_pac_col <= win_con_pac_col + 1;
 				end if;
-			elsif (next_dir = "10") then -- UP
+			-- Moving UP
+			elsif (counter = "10") then
 				if (pac_row > 0) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
 					pac_row <= pac_row - 16;
 					my_pac_for_top <= my_pac_for_top - 16;
 					win_con_pac_row <= win_con_pac_row - 1;
 				end if;
-			elsif (next_dir = "11") then -- DOWN
+			-- Moving DOWN
+			elsif (counter = "11") then
 				if (pac_row < 288) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
 					pac_row <= pac_row + 16;
 					my_pac_for_top <= my_pac_for_top + 16;
@@ -523,6 +506,9 @@ IF (enableMsg = '1') THEN
 				end if;
 			end if;
 		end if;
+
+		--Resetting threshold
+		threshold <= 0;
 	end if;
 	if ghostlock = '1' then --draw ghost and pacboii
 		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
@@ -638,70 +624,40 @@ end if;
 		threshold_ghost <= 0;
 		ghostlock <= not ghostlock;
 
-	--Boundary to keep within the map
-	--for preventing left movements between boxes
-		
-		if(direction = "00" AND my_ass_for_left < 399 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "00" AND my_ass_for_left < 399 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif (direction = "00" AND my_ass_for_left < 399) then -- for outter left wall
-				pix_count_col <= pix_count_col -16;
-				my_ass_for_left <= my_ass_for_left +16;
-				win_con_ghost_col <= win_con_ghost_col -1;
+	-- Precise grid collision & Hold-to-Move controller
+		if (is_pacman_moving = '1') then
+			-- Moving LEFT
+			if (counter = "00") then
+				if (pac_col > 0) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col - 16;
+					my_pac_for_left <= my_pac_for_left - 16;
+					win_con_pac_col <= win_con_pac_col - 1;
+				end if;
+			-- Moving RIGHT
+			elsif (counter = "01") then
+				if (pac_col < 528) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
+					pac_col <= pac_col + 16;
+					my_pac_for_left <= my_pac_for_left + 16;
+					win_con_pac_col <= win_con_pac_col + 1;
+				end if;
+			-- Moving UP
+			elsif (counter = "10") then
+				if (pac_row > 0) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row - 16;
+					my_pac_for_top <= my_pac_for_top - 16;
+					win_con_pac_row <= win_con_pac_row - 1;
+				end if;
+			-- Moving DOWN
+			elsif (counter = "11") then
+				if (pac_row < 288) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
+					pac_row <= pac_row + 16;
+					my_pac_for_top <= my_pac_for_top + 16;
+					win_con_pac_row <= win_con_pac_row + 1;
+				end if;
+			end if;
 		end if;
-		
-	--for preventing right movements between boxes
-		if(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
-				pix_count_col <=pix_count_col+0;
-				--my_ass_for_left <= my_ass_for_left +16;
-		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16) then -- for outter right wall
-				pix_count_col <= pix_count_col +16;
-				my_ass_for_left <= my_ass_for_left -16;
-				win_con_ghost_col <= win_con_ghost_col +1;
-		end if;
-		
-	--for preventing up movements between boxes
-		
-		if (direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-		elsif (direction = "10" AND my_ass_for_top < 143) then
-			pix_count_row <= pix_count_row -16;
-			my_ass_for_top <= my_ass_for_top +16;
-			win_con_ghost_row <= win_con_ghost_row -1;
-		end if;
-		--for preventing down movements between boxes 
-		
-		if (direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-			--my_ass_for_top <= my_ass_for_top +16;
-		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
-			pix_count_row <= pix_count_row - 0;
-		elsif (direction = "11" AND my_ass_for_top <= 144 and ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM) then
-			pix_count_row <= pix_count_row +16;
-			my_ass_for_top <= my_ass_for_top -16;
-			win_con_ghost_row <= win_con_ghost_row +1;
-		end if;
+		--Resetting threshold
+		threshold <= 0;
 	end if;
 	if ghostlock = '1' then --draw ghost and pacboii
 		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
