@@ -37,6 +37,8 @@ signal my_pac_for_left : integer := 0; --signal to stop moving left
 signal pix_count_row : integer := 0;
 signal threshold: integer :=0;
 signal threshold2: integer :=0;
+signal threshold_pac: integer := 0;
+signal threshold_ghost: integer := 0;
 signal ghostlock,paclock: std_logic :='0';
 signal is_pacman_moving : std_logic := '0';
 --signals for pacboii random movements
@@ -67,6 +69,7 @@ end function in_box;
 BEGIN
 
 PROCESS(clk)
+variable next_dir    : bit_vector(1 downto 0);
 variable pacboii_row : integer := 225;
 variable pacboii_col : integer := 1;
 constant MAP_WALL_LEFT: integer := 48;
@@ -466,9 +469,10 @@ IF (enableMsg = '1') THEN
 		rand <= rand rol 1;
 		threshold2 <= 0;
 	end if;
-	if threshold >= 5000000 then 
+	threshold_pac <= threshold_pac + 1;
+	if threshold_pac >= 5000000 then 
+		threshold_pac <= 0;
 		paclock <= not paclock;
-		--if (Pixel_Row < 390 and Pixel_Row > 360) or --and ((Pixel_col < 40 and Pixel_col > 75) or (Pixel_col < 190 and Pixel_col > 220) or (Pixel_col < 330 and Pixel_col > 360) or (Pixel_col < 440 and Pixel_col > 475) or (Pixel_col < 570 and Pixel_col > 600))) or 
 
 	-- Precise grid collision & Hold-to-Move controller
 		if (is_pacman_moving = '1') then
@@ -515,8 +519,25 @@ IF (enableMsg = '1') THEN
 	--
 	--
 	--
-	-- WIN THE GAME HERE 1
-if (win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col) then
+	-- WIN THE GAME HERE 1 / GHOST CATCHES PACMAN (INSTANT RESET)
+	if (
+		-- 1. Exact grid tile match
+		(win_con_ghost_row = win_con_pac_row and win_con_ghost_col = win_con_pac_col)
+		or
+		-- 2. Same row and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_row = win_con_pac_row and 
+		 (win_con_ghost_col - win_con_pac_col >= -1 and win_con_ghost_col - win_con_pac_col <= 1))
+		or
+		-- 3. Same column and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_col = win_con_pac_col and 
+		 (win_con_ghost_row - win_con_pac_row >= -1 and win_con_ghost_row - win_con_pac_row <= 1))
+		or
+		-- 4. Screen bounding box overlap (with 4px margin)
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
 	win_con_pac_col <= 0;
@@ -527,6 +548,11 @@ if (win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col)
 		my_ass_for_top<=0;
 		pac_row<=0;
 		pac_col<=0;
+		my_pac_for_left<=0;
+		my_pac_for_top<=0;
+		pac_started <= '0';
+		pac_current_dir <= "01";
+		pac_desired_dir <= "01";
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
@@ -590,13 +616,13 @@ end if;
 		--
 		--
 		--
-	threshold <= threshold+1;
+	threshold_ghost <= threshold_ghost+1;
 	--
 	-- Ghost Controller
 	--
-	if threshold >= 5000000 then 
+	if threshold_ghost >= 5000000 then 
+		threshold_ghost <= 0;
 		ghostlock <= not ghostlock;
-		--if (Pixel_Row < 390 and Pixel_Row > 360) or --and ((Pixel_col < 40 and Pixel_col > 75) or (Pixel_col < 190 and Pixel_col > 220) or (Pixel_col < 330 and Pixel_col > 360) or (Pixel_col < 440 and Pixel_col > 475) or (Pixel_col < 570 and Pixel_col > 600))) or 
 
 	-- Precise grid collision & Hold-to-Move controller
 		if (is_pacman_moving = '1') then
@@ -630,7 +656,6 @@ end if;
 				end if;
 			end if;
 		end if;
-
 		--Resetting threshold
 		threshold <= 0;
 	end if;
@@ -854,7 +879,26 @@ end if;
 		end if;
 		
 -- WIN 2 BECAUSE IDK WHY IT WORKS THOUGH
-	if ((win_con_ghost_row = win_con_pac_row AND win_con_ghost_col = win_con_pac_col) OR BALLCOUNT = 15) then
+	if (
+		BALLCOUNT = 15
+		or
+		-- 1. Exact grid tile match
+		(win_con_ghost_row = win_con_pac_row and win_con_ghost_col = win_con_pac_col)
+		or
+		-- 2. Same row and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_row = win_con_pac_row and 
+		 (win_con_ghost_col - win_con_pac_col >= -1 and win_con_ghost_col - win_con_pac_col <= 1))
+		or
+		-- 3. Same column and adjacent / leapfrogging (distance <= 1)
+		(win_con_ghost_col = win_con_pac_col and 
+		 (win_con_ghost_row - win_con_pac_row >= -1 and win_con_ghost_row - win_con_pac_row <= 1))
+		or
+		-- 4. Screen bounding box overlap (with 4px margin)
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
 	win_con_pac_col <= 0;
@@ -865,6 +909,11 @@ end if;
 		my_ass_for_top<=0;
 		pac_row<=0;
 		pac_col<=0;
+		my_pac_for_left<=0;
+		my_pac_for_top<=0;
+		pac_started <= '0';
+		pac_current_dir <= "01";
+		pac_desired_dir <= "01";
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
