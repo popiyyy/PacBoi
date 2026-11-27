@@ -13,6 +13,7 @@ ENTITY msgHello IS
 		  enableMsg : IN std_logic;
 		  pimpclock,clk : IN STD_LOGIC; 
 		  S_SWITCH, R_SWITCH, B_UP, B_DOWN, B_LEFT, B_RIGHT : IN std_logic;
+		  pause_en : IN std_logic := '0';
 	      Char_address: OUT std_logic_vector (13 downto 0);
 			Char_address2: buffer std_logic_vector (7 downto 0);
 	     	 Font_row: OUT std_logic_vector (3 downto 0);
@@ -25,7 +26,12 @@ signal win_con_pac_row : integer :=0;
 signal win_con_pac_col : integer :=0;
 signal win_con_ghost_row : integer :=9;
 signal win_con_ghost_col : integer :=25;
+signal win_con_ghost2_row : integer :=18;
+signal win_con_ghost2_col : integer :=9;
+signal pix_count2_row : integer := 144;
+signal pix_count2_col : integer := -256;
 signal direction : bit_vector (1 downto 0);
+signal direction2 : bit_vector (1 downto 0) := "01";
 signal counter : bit_vector (1 downto 0);
 signal char_check : integer :=0;
 SIGNAL Flag : std_logic :='0';
@@ -51,6 +57,7 @@ signal loop_counter : std_logic_vector (7 downto 0);
 signal isHitTopWall,isHitLeftWall,isHitBottomWall,isHitRightWall : std_logic := '0';
 signal gUp,gRight,gDown,gLeft : std_logic := '0';
 signal BALLCOUNT : integer := 0;
+signal HIGH_SCORE : integer := 0;
 signal BALL1_UNLOCK_Value,BALL2_UNLOCK_Value,BALL3_UNLOCK_Value,BALL4_UNLOCK_Value,BALL5_UNLOCK_Value : std_logic := '0';
 signal BALL6_UNLOCK_Value,BALL7_UNLOCK_Value,BALL8_UNLOCK_Value,BALL9_UNLOCK_Value,BALL10_UNLOCK_Value : std_logic := '0';
 signal BALL11_UNLOCK_Value,BALL12_UNLOCK_Value,BALL13_UNLOCK_Value,BALL14_UNLOCK_Value,BALL15_UNLOCK_Value : std_logic := '0';
@@ -324,11 +331,17 @@ IF (enableMsg = '1') THEN
 
 -- TIME TO START THE GAME
 	if in_box(286, 44, 300, 60, pixel_Row, Pixel_Col) then
-        if BALLCOUNT > 9 then
-            Char_address <= CONV_STD_LOGIC_VECTOR(15, 14);
-        else
-            Char_address <= CONV_STD_LOGIC_VECTOR(14, 14);
-        end if;
+        Char_address <= CONV_STD_LOGIC_VECTOR(14 + ((BALLCOUNT / 10) mod 10), 14);
+    end if;
+	if in_box(301, 44, 318, 60, pixel_Row, Pixel_Col) then
+        Char_address <= CONV_STD_LOGIC_VECTOR(14 + (BALLCOUNT mod 10), 14);
+    end if;
+	-- HIGH SCORE display (top right, x = 480..512, y = 44..60)
+	if in_box(480, 44, 495, 60, pixel_Row, Pixel_Col) then
+        Char_address <= CONV_STD_LOGIC_VECTOR(14 + ((HIGH_SCORE / 10) mod 10), 14);
+    end if;
+	if in_box(496, 44, 512, 60, pixel_Row, Pixel_Col) then
+        Char_address <= CONV_STD_LOGIC_VECTOR(14 + (HIGH_SCORE mod 10), 14);
     end if;
 	if in_box(301, 44, 318, 60, pixel_Row, Pixel_Col) then
         if BALLCOUNT = 0 or BALLCOUNT = 10 then
@@ -353,6 +366,10 @@ IF (enableMsg = '1') THEN
             Char_address <= CONV_STD_LOGIC_VECTOR(12, 14);
         end if;
     end if;
+	if (pause_en = '0') then
+	if BALLCOUNT > HIGH_SCORE then
+		HIGH_SCORE <= BALLCOUNT;
+	end if;
 	threshold <= threshold+1;
 	threshold2 <= threshold2+1;
 	--
@@ -465,8 +482,8 @@ IF (enableMsg = '1') THEN
 	--Pacman Controller
 	--
 	
-	if threshold2 >= 25000000 then
-		rand <= rand rol 1;
+	if threshold2 >= 62500000 then
+		rand <= rand(9 downto 0) & (rand(10) xor rand(8));
 		threshold2 <= 0;
 	end if;
 	threshold_pac <= threshold_pac + 1;
@@ -510,12 +527,10 @@ IF (enableMsg = '1') THEN
 		--Resetting threshold
 		threshold <= 0;
 	end if;
-	if ghostlock = '1' then --draw ghost and pacboii
-		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
-	end if;
-	if paclock = '1' then --draw ghost and pacboii
-		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
-	end if;
+	-- Always draw ghosts and pacboii (smooth, no blinking)
+	if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(COL_PATH4_LEFT+pix_count2_col, ROW_PATH2_TOP+pix_count2_row, COL_PATH4_RIGHT+pix_count2_col, ROW_PATH2_BOTTOM+pix_count2_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 	--
 	--
 	--
@@ -537,9 +552,22 @@ IF (enableMsg = '1') THEN
 		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
 		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
 		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+		or
+		-- 5. Ghost 2 collision
+		(win_con_ghost2_row = win_con_pac_row and win_con_ghost2_col = win_con_pac_col)
+		or
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count2_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count2_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count2_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count2_row))
 	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
+	win_con_ghost2_row <= 18;
+	win_con_ghost2_col <= 9;
+	pix_count2_row <= 144;
+	pix_count2_col <= -256;
+	direction2 <= "01";
 	win_con_pac_col <= 0;
 	win_con_pac_row <= 0;
 		pix_count_row<=0;
@@ -550,9 +578,6 @@ IF (enableMsg = '1') THEN
 		pac_col<=0;
 		my_pac_for_left<=0;
 		my_pac_for_top<=0;
-		pac_started <= '0';
-		pac_current_dir <= "01";
-		pac_desired_dir <= "01";
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
@@ -575,6 +600,17 @@ BALLCOUNT <= 0;
 	if (R_SWITCH ='1') then --reset game to default start position
 		win_con_ghost_row <= 9;
 		win_con_ghost_col <= 25;
+		win_con_ghost2_row <= 18;
+		win_con_ghost2_col <= 9;
+		pix_count2_row <= 144;
+		pix_count2_col <= -256;
+		direction2 <= "01";
+		BALLCOUNT <= 0;
+		BALL1_UNLOCK_Value <= '0'; BALL2_UNLOCK_Value <= '0'; BALL3_UNLOCK_Value <= '0';
+		BALL4_UNLOCK_Value <= '0'; BALL5_UNLOCK_Value <= '0'; BALL6_UNLOCK_Value <= '0';
+		BALL7_UNLOCK_Value <= '0'; BALL8_UNLOCK_Value <= '0'; BALL9_UNLOCK_Value <= '0';
+		BALL10_UNLOCK_Value <= '0'; BALL11_UNLOCK_Value <= '0'; BALL12_UNLOCK_Value <= '0';
+		BALL13_UNLOCK_Value <= '0'; BALL14_UNLOCK_Value <= '0'; BALL15_UNLOCK_Value <= '0';
 		win_con_pac_col <= 0;
 		win_con_pac_row <= 0;
 		pix_count_row<=0;
@@ -603,8 +639,8 @@ BALL13_UNLOCK_Value <= '0';
 BALL14_UNLOCK_Value <= '0';
 BALL15_UNLOCK_Value <= '0';
 	end if;
---	end if;
-end if;
+	end if; -- pause_en = '0' (section 1)
+end if; -- enableMsg = '1'
 		--
 		--
 		--
@@ -616,6 +652,7 @@ end if;
 		--
 		--
 		--
+	if (pause_en = '0') then
 	threshold_ghost <= threshold_ghost+1;
 	--
 	-- Ghost Controller
@@ -624,47 +661,92 @@ end if;
 		threshold_ghost <= 0;
 		ghostlock <= not ghostlock;
 
-	-- Precise grid collision & Hold-to-Move controller
-		if (is_pacman_moving = '1') then
-			-- Moving LEFT
-			if (counter = "00") then
-				if (pac_col > 0) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
-					pac_col <= pac_col - 16;
-					my_pac_for_left <= my_pac_for_left - 16;
-					win_con_pac_col <= win_con_pac_col - 1;
-				end if;
-			-- Moving RIGHT
-			elsif (counter = "01") then
-				if (pac_col < 528) and (pac_row = 0 or pac_row = 144 or pac_row = 288) then
-					pac_col <= pac_col + 16;
-					my_pac_for_left <= my_pac_for_left + 16;
-					win_con_pac_col <= win_con_pac_col + 1;
-				end if;
-			-- Moving UP
-			elsif (counter = "10") then
-				if (pac_row > 0) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
-					pac_row <= pac_row - 16;
-					my_pac_for_top <= my_pac_for_top - 16;
-					win_con_pac_row <= win_con_pac_row - 1;
-				end if;
-			-- Moving DOWN
-			elsif (counter = "11") then
-				if (pac_row < 288) and (pac_col = 0 or pac_col = 144 or pac_col = 288 or pac_col = 400 or pac_col = 528) then
-					pac_row <= pac_row + 16;
-					my_pac_for_top <= my_pac_for_top + 16;
-					win_con_pac_row <= win_con_pac_row + 1;
-				end if;
+		-- Ghost 2 horizontal patrol along bottom path (row 18)
+		if direction2 = "01" then
+			if win_con_ghost2_col < 33 then
+				pix_count2_col <= pix_count2_col + 16;
+				win_con_ghost2_col <= win_con_ghost2_col + 1;
+			else
+				direction2 <= "00";
+			end if;
+		else
+			if win_con_ghost2_col > 0 then
+				pix_count2_col <= pix_count2_col - 16;
+				win_con_ghost2_col <= win_con_ghost2_col - 1;
+			else
+				direction2 <= "01";
 			end if;
 		end if;
-		--Resetting threshold
-		threshold <= 0;
+
+	--Boundary to keep within the map
+	--for preventing left movements between boxes
+		
+		if(direction = "00" AND my_ass_for_left < 399 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
+				pix_count_col <=pix_count_col+0;
+				--my_ass_for_left <= my_ass_for_left +16;
+		elsif(direction = "00" AND my_ass_for_left < 399 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
+				pix_count_col <=pix_count_col+0;
+				--my_ass_for_left <= my_ass_for_left +16;
+		elsif (direction = "00" AND my_ass_for_left < 399) then -- for outter left wall
+				pix_count_col <= pix_count_col -16;
+				my_ass_for_left <= my_ass_for_left +16;
+				win_con_ghost_col <= win_con_ghost_col -1;
+		end if;
+		
+	--for preventing right movements between boxes
+		if(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH1_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH2_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then --for top row
+				pix_count_col <=pix_count_col+0;
+				--my_ass_for_left <= my_ass_for_left +16;
+		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16 and ROW_PATH2_BOTTOM < ROW_PATH2_TOP+pix_count_row and ROW_PATH3_TOP > ROW_PATH2_BOTTOM+pix_count_row ) then  --for bottom row
+				pix_count_col <=pix_count_col+0;
+				--my_ass_for_left <= my_ass_for_left +16;
+		elsif(direction = "01" AND pix_count_col+COL_PATH4_RIGHT < MAP_WALL_RIGHT-16) then -- for outter right wall
+				pix_count_col <= pix_count_col +16;
+				my_ass_for_left <= my_ass_for_left -16;
+				win_con_ghost_col <= win_con_ghost_col +1;
+		end if;
+		
+	--for preventing up movements between boxes
+		
+		if (direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "10" AND my_ass_for_top < 143 and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+		elsif (direction = "10" AND my_ass_for_top < 143) then
+			pix_count_row <= pix_count_row -16;
+			my_ass_for_top <= my_ass_for_top +16;
+			win_con_ghost_row <= win_con_ghost_row -1;
+		end if;
+		--for preventing down movements between boxes 
+		
+		if (direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH4_RIGHT and COL_PATH5_LEFT >= COL_PATH4_RIGHT+pix_count_col) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH3_RIGHT and COL_PATH4_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH2_RIGHT and COL_PATH3_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+			--my_ass_for_top <= my_ass_for_top +16;
+		elsif(direction = "11" AND ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM and COL_PATH4_LEFT+pix_count_col+1 >=COL_PATH1_RIGHT and COL_PATH2_LEFT >= COL_PATH4_RIGHT+pix_count_col-1) then
+			pix_count_row <= pix_count_row - 0;
+		elsif (direction = "11" AND my_ass_for_top <= 144 and ROW_PATH2_BOTTOM+pix_count_row < MAP_WALL_BOTTOM) then
+			pix_count_row <= pix_count_row +16;
+			my_ass_for_top <= my_ass_for_top -16;
+			win_con_ghost_row <= win_con_ghost_row +1;
+		end if;
 	end if;
-	if ghostlock = '1' then --draw ghost and pacboii
-		if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
-	end if;
-	if paclock = '1' then --draw ghost and pacboii
-		if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
-	end if;
+	-- Always draw ghosts and pacboii (smooth, no blinking)
+	if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(COL_PATH4_LEFT+pix_count2_col, ROW_PATH2_TOP+pix_count2_row, COL_PATH4_RIGHT+pix_count2_col, ROW_PATH2_BOTTOM+pix_count2_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
 			--
 			--OUR BALLZ
 		--BALL 1
@@ -880,8 +962,6 @@ end if;
 		
 -- WIN 2 BECAUSE IDK WHY IT WORKS THOUGH
 	if (
-		BALLCOUNT = 15
-		or
 		-- 1. Exact grid tile match
 		(win_con_ghost_row = win_con_pac_row and win_con_ghost_col = win_con_pac_col)
 		or
@@ -898,9 +978,22 @@ end if;
 		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count_col) and
 		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count_row) and
 		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count_row))
+		or
+		-- 5. Ghost 2 collision
+		(win_con_ghost2_row = win_con_pac_row and win_con_ghost2_col = win_con_pac_col)
+		or
+		((MAP_WALL_LEFT + pac_col - 4) <= (COL_PATH4_RIGHT + pix_count2_col) and
+		 (COL_PATH1_RIGHT + pac_col + 4) >= (COL_PATH4_LEFT + pix_count2_col) and
+		 (MAP_WALL_TOP + pac_row - 4) <= (ROW_PATH2_BOTTOM + pix_count2_row) and
+		 (ROW_PATH1_BOTTOM + pac_row + 4) >= (ROW_PATH2_TOP + pix_count2_row))
 	) then
 	win_con_ghost_row <= 9;
 	win_con_ghost_col <= 25;
+	win_con_ghost2_row <= 18;
+	win_con_ghost2_col <= 9;
+	pix_count2_row <= 144;
+	pix_count2_col <= -256;
+	direction2 <= "01";
 	win_con_pac_col <= 0;
 	win_con_pac_row <= 0;
 		pix_count_row<=0;
@@ -911,9 +1004,6 @@ end if;
 		pac_col<=0;
 		my_pac_for_left<=0;
 		my_pac_for_top<=0;
-		pac_started <= '0';
-		pac_current_dir <= "01";
-		pac_desired_dir <= "01";
 		gLeft<='0';gUp<='0';gRight<='0';gDown<='0';
 BALL1_UNLOCK_Value <= '0';
 BALL2_UNLOCK_Value <= '0';
@@ -935,6 +1025,17 @@ BALLCOUNT <= 0;
 	if (R_SWITCH ='1') then --reset game to default start position
 		win_con_ghost_row <= 9;
 		win_con_ghost_col <= 25;
+		win_con_ghost2_row <= 18;
+		win_con_ghost2_col <= 9;
+		pix_count2_row <= 144;
+		pix_count2_col <= -256;
+		direction2 <= "01";
+		BALLCOUNT <= 0;
+		BALL1_UNLOCK_Value <= '0'; BALL2_UNLOCK_Value <= '0'; BALL3_UNLOCK_Value <= '0';
+		BALL4_UNLOCK_Value <= '0'; BALL5_UNLOCK_Value <= '0'; BALL6_UNLOCK_Value <= '0';
+		BALL7_UNLOCK_Value <= '0'; BALL8_UNLOCK_Value <= '0'; BALL9_UNLOCK_Value <= '0';
+		BALL10_UNLOCK_Value <= '0'; BALL11_UNLOCK_Value <= '0'; BALL12_UNLOCK_Value <= '0';
+		BALL13_UNLOCK_Value <= '0'; BALL14_UNLOCK_Value <= '0'; BALL15_UNLOCK_Value <= '0';
 		win_con_pac_col <= 0;
 		win_con_pac_row <= 0;
 		pix_count_row<=0;
@@ -966,6 +1067,29 @@ BALL14_UNLOCK_Value <= '0';
 BALL15_UNLOCK_Value <= '0';
 BALLCOUNT <= 0;
 	end if;
+	-- Random respawn of eaten balls (~2.5s) only when Pacman is not standing on the spot
+	if threshold2 >= 62500000 then
+		if BALL1_UNLOCK_Value  = '1' and rand(0)  = '1' and not (win_con_pac_row = BALL_ROW_1 and win_con_pac_col = BALL1_COL_NUM) then BALL1_UNLOCK_Value  <= '0'; end if;
+		if BALL2_UNLOCK_Value  = '1' and rand(1)  = '1' and not (win_con_pac_row = BALL_ROW_1 and win_con_pac_col = BALL2_COL_NUM) then BALL2_UNLOCK_Value  <= '0'; end if;
+		if BALL3_UNLOCK_Value  = '1' and rand(2)  = '1' and not (win_con_pac_row = BALL_ROW_1 and win_con_pac_col = BALL3_COL_NUM) then BALL3_UNLOCK_Value  <= '0'; end if;
+		if BALL4_UNLOCK_Value  = '1' and rand(3)  = '1' and not (win_con_pac_row = BALL_ROW_1 and win_con_pac_col = BALL4_COL_NUM) then BALL4_UNLOCK_Value  <= '0'; end if;
+		if BALL5_UNLOCK_Value  = '1' and rand(4)  = '1' and not (win_con_pac_row = BALL_ROW_1 and win_con_pac_col = BALL5_COL_NUM) then BALL5_UNLOCK_Value  <= '0'; end if;
+		if BALL6_UNLOCK_Value  = '1' and rand(5)  = '1' and not (win_con_pac_row = BALL_ROW_2 and win_con_pac_col = BALL1_COL_NUM) then BALL6_UNLOCK_Value  <= '0'; end if;
+		if BALL7_UNLOCK_Value  = '1' and rand(6)  = '1' and not (win_con_pac_row = BALL_ROW_2 and win_con_pac_col = BALL2_COL_NUM) then BALL7_UNLOCK_Value  <= '0'; end if;
+		if BALL8_UNLOCK_Value  = '1' and rand(7)  = '1' and not (win_con_pac_row = BALL_ROW_2 and win_con_pac_col = BALL3_COL_NUM) then BALL8_UNLOCK_Value  <= '0'; end if;
+		if BALL9_UNLOCK_Value  = '1' and rand(8)  = '1' and not (win_con_pac_row = BALL_ROW_2 and win_con_pac_col = BALL4_COL_NUM) then BALL9_UNLOCK_Value  <= '0'; end if;
+		if BALL10_UNLOCK_Value = '1' and rand(9)  = '1' and not (win_con_pac_row = BALL_ROW_2 and win_con_pac_col = BALL5_COL_NUM) then BALL10_UNLOCK_Value <= '0'; end if;
+		if BALL11_UNLOCK_Value = '1' and rand(10) = '1' and not (win_con_pac_row = BALL_ROW_3 and win_con_pac_col = BALL1_COL_NUM) then BALL11_UNLOCK_Value <= '0'; end if;
+		if BALL12_UNLOCK_Value = '1' and rand(0)  = '1' and not (win_con_pac_row = BALL_ROW_3 and win_con_pac_col = BALL2_COL_NUM) then BALL12_UNLOCK_Value <= '0'; end if;
+		if BALL13_UNLOCK_Value = '1' and rand(2)  = '1' and not (win_con_pac_row = BALL_ROW_3 and win_con_pac_col = BALL3_COL_NUM) then BALL13_UNLOCK_Value <= '0'; end if;
+		if BALL14_UNLOCK_Value = '1' and rand(4)  = '1' and not (win_con_pac_row = BALL_ROW_3 and win_con_pac_col = BALL4_COL_NUM) then BALL14_UNLOCK_Value <= '0'; end if;
+		if BALL15_UNLOCK_Value = '1' and rand(6)  = '1' and not (win_con_pac_row = BALL_ROW_3 and win_con_pac_col = BALL5_COL_NUM) then BALL15_UNLOCK_Value <= '0'; end if;
+	end if;
+	end if; -- pause_en = '0' (section 2)
+	-- Always draw ghosts and pacboii even when paused
+	if in_box(COL_PATH4_LEFT+pix_count_col, ROW_PATH2_TOP+pix_count_row, COL_PATH4_RIGHT+pix_count_col, ROW_PATH2_BOTTOM+pix_count_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(COL_PATH4_LEFT+pix_count2_col, ROW_PATH2_TOP+pix_count2_row, COL_PATH4_RIGHT+pix_count2_col, ROW_PATH2_BOTTOM+pix_count2_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(0,14); end if;
+	if in_box(MAP_WALL_LEFT+pac_col, MAP_WALL_TOP+pac_row, COL_PATH1_RIGHT+pac_col, ROW_PATH1_BOTTOM+pac_row, pixel_Row, pixel_Col) then Char_address <= CONV_STD_LOGIC_VECTOR(1,14); end if;
     END IF; -- rising_edge(clk)
 END PROCESS;
 END;

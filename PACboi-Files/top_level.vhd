@@ -64,6 +64,16 @@ ARCHITECTURE structural OF top_level IS
         );
     END COMPONENT;
 
+    COMPONENT pause_menu IS
+        PORT(
+            pixel_row  : IN  std_logic_vector(9 DOWNTO 0);
+            pixel_col  : IN  std_logic_vector(9 DOWNTO 0);
+            pause_sel  : IN  std_logic;
+            box_active : OUT std_logic;
+            pixel_on   : OUT std_logic
+        );
+    END COMPONENT;
+
     COMPONENT msgHello IS
         PORT(
             Pixel_row: IN std_logic_vector(9 downto 0);
@@ -71,6 +81,7 @@ ARCHITECTURE structural OF top_level IS
             enableMsg : IN std_logic;
             pimpclock, clk : IN STD_LOGIC;
             S_SWITCH, R_SWITCH, B_UP, B_DOWN, B_LEFT, B_RIGHT : IN std_logic;
+            pause_en     : IN std_logic := '0';
             Char_address : OUT std_logic_vector(13 downto 0);
             Char_address2: buffer std_logic_vector(7 downto 0);
             Font_row     : OUT std_logic_vector(3 downto 0);
@@ -94,29 +105,75 @@ ARCHITECTURE structural OF top_level IS
 
     -- Start/Pause State Logic
     SIGNAL btn_start_prev  : std_logic := '0';
+    SIGNAL btn_up_prev     : std_logic := '0';
+    SIGNAL btn_down_prev   : std_logic := '0';
     SIGNAL game_running    : std_logic := '1';
+    SIGNAL game_paused     : std_logic;
+    SIGNAL pause_sel       : std_logic := '0'; -- '0' = LANJUTKAN, '1' = ULANG
+    SIGNAL restart_cnt     : integer range 0 to 1000000 := 0;
+    SIGNAL restart_pulse   : std_logic := '0';
+    SIGNAL game_reset_sig  : std_logic;
+    SIGNAL clk_game_gated  : std_logic;
     SIGNAL btn_up_gated    : std_logic;
     SIGNAL btn_down_gated  : std_logic;
     SIGNAL btn_left_gated  : std_logic;
     SIGNAL btn_right_gated : std_logic;
+    SIGNAL pause_box_active: std_logic;
+    SIGNAL pause_pixel_on  : std_logic;
+    SIGNAL final_color_bit : std_logic;
 
 BEGIN
 
-    -- Start/Pause toggle controller
+    -- Start/Pause & Menu Navigation Controller
     process(clk_25MHz, sw_reset)
     begin
         if sw_reset = '1' then
             game_running   <= '1';
+            pause_sel      <= '0';
             btn_start_prev <= '0';
+            btn_up_prev    <= '0';
+            btn_down_prev  <= '0';
+            restart_cnt    <= 0;
+            restart_pulse  <= '0';
         elsif rising_edge(clk_25MHz) then
             btn_start_prev <= btn_start;
-            if (btn_start = '1' and btn_start_prev = '0') then
-                game_running <= not game_running;
+            btn_up_prev    <= btn_up;
+            btn_down_prev  <= btn_down;
+
+            if restart_cnt > 0 then
+                restart_cnt   <= restart_cnt - 1;
+                restart_pulse <= '1';
+            else
+                restart_pulse <= '0';
+            end if;
+
+            if game_running = '1' then
+                if (btn_start = '1' and btn_start_prev = '0') then
+                    game_running <= '0';
+                    pause_sel    <= '0';
+                end if;
+            else
+                -- Menu navigation while paused
+                if (btn_up = '1' and btn_up_prev = '0') then
+                    pause_sel <= '0'; -- 1. LANJUTKAN
+                elsif (btn_down = '1' and btn_down_prev = '0') then
+                    pause_sel <= '1'; -- 2. ULANG
+                end if;
+
+                if (btn_start = '1' and btn_start_prev = '0') then
+                    game_running <= '1';
+                    if pause_sel = '1' then
+                        restart_cnt <= 1000000; -- ~40ms reset pulse at 25MHz
+                    end if;
+                end if;
             end if;
         end if;
     end process;
 
-    -- Freeze player movements when paused (UJI-06)
+    -- Freeze game clock and player movements when paused
+    game_paused     <= not game_running;
+    game_reset_sig  <= sw_reset or restart_pulse;
+    clk_game_gated  <= clk_game  when game_running = '1' else '0';
     btn_up_gated    <= btn_up    when game_running = '1' else '0';
     btn_down_gated  <= btn_down  when game_running = '1' else '0';
     btn_left_gated  <= btn_left  when game_running = '1' else '0';
@@ -154,14 +211,15 @@ BEGIN
             Pixel_row     => pixel_row_sig,
             Pixel_col     => pixel_col_sig,
             enableMsg     => '1',
-            pimpclock     => clk_game,
+            pimpclock     => clk_game_gated,
             clk           => clk_25MHz,
             S_SWITCH      => '1', -- Pacman mode enabled
-            R_SWITCH      => sw_reset,
-            B_UP          => btn_up,
-            B_DOWN        => btn_down,
-            B_LEFT        => btn_left,
-            B_RIGHT       => btn_right,
+            R_SWITCH      => game_reset_sig,
+            B_UP          => btn_up_gated,
+            B_DOWN        => btn_down_gated,
+            B_LEFT        => btn_left_gated,
+            B_RIGHT       => btn_right_gated,
+            pause_en      => game_paused,
             Char_address  => char_addr_sig,
             Char_address2 => open,
             Font_row      => font_row_sig,
@@ -178,10 +236,22 @@ BEGIN
             rom_mux_output    => color_bit_sig
         );
 
+    -- 4b. Pause Menu Overlay
+    u_pause_menu: pause_menu
+        PORT MAP(
+            pixel_row  => pixel_row_sig,
+            pixel_col  => pixel_col_sig,
+            pause_sel  => pause_sel,
+            box_active => pause_box_active,
+            pixel_on   => pause_pixel_on
+        );
+
+    final_color_bit <= pause_pixel_on when (game_running = '0' and pause_box_active = '1') else color_bit_sig;
+
     -- 5. 12-bit RGB Color Converter
     u_yakuza_conv: YAKUZA_CONV
         PORT MAP(
-            color_bit    => color_bit_sig,
+            color_bit    => final_color_bit,
             video_on     => video_on_sig,
             red_fourbit  => red_conv_sig,
             blue_fourbit => blue_conv_sig,
